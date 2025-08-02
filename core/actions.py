@@ -17,8 +17,19 @@ class Actions:
             self.d.app_stop(pkg) if driver_type=="uiautomator2" else self.d.terminate_app(pkg)
 
         if config.get("clear_data", False):
-            self.logger.debug(f"Clearing data for {pkg}")
-            self.d.app_clear(pkg) if driver_type=="uiautomator2" else self.d.reset()
+            self.logger.debug(f"Clearing data for {pkg} using ADB")
+            cmd = ["adb", "-s", self.device_id, "shell", "pm", "clear", pkg]
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                if result.returncode != 0 or "Success" not in result.stdout:
+                    self.logger.error(f"Failed to clear data for {pkg}: {result.stderr.strip()} {result.stdout.strip()}")
+                    raise RuntimeError(f"Failed to clear data for {pkg}")
+                else:
+                    self.logger.debug(f"Data cleared for {pkg}")
+            except subprocess.TimeoutExpired:
+                self.logger.error(f"Timeout while clearing data for {pkg}")
+                raise
+            
         
         # launch app
         self.logger.debug(f"Launching {pkg}")
