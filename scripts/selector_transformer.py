@@ -235,18 +235,25 @@ class UnifiedElementFinder:
                     raise ImportError("Could not import Appium/Selenium By class") from exc
             self._By = _By
 
-    # ------------------------------------------------------------------
     def find_element(self, selector_type: str, selector_value: str):
-        """Find one element using a *generic* selector."""
+        """Find one element using a *generic* selector with a 5s UI wait for UIAutomator2."""
         loc = self.transformer.transform_selector(selector_type, selector_value, self.framework)
+
         if self.framework == "appium":
             by, value = loc  # type: ignore[misc]
             by_enum = getattr(self._By, by.upper().replace(" ", "_"))
             return self.backend.find_element(by_enum, value)
-        # UIAutomator2 branch
+
+        # UIAutomator2 branch, inject 5s wait
         if "xpath" in loc:  # type: ignore[arg-type]
-            return self.backend.xpath(loc["xpath"])
-        return self.backend(**loc)  # type: ignore[arg-type]
+            elem = self.backend.xpath(loc["xpath"])
+            if elem.wait(timeout=5.0):
+                return elem
+            raise RuntimeError(f"[uiautomator2] Element (xpath={loc['xpath']}) not found in 5s")
+        elem = self.backend(**loc)
+        if elem.wait(timeout=5.0):
+            return elem
+        raise RuntimeError(f"[uiautomator2] Element ({loc}) not found in 5s")
 
     def find_elements(self, selector_type: str, selector_value: str):
         """Find *all* matching elements using a *generic* selector."""
@@ -255,7 +262,6 @@ class UnifiedElementFinder:
             by, value = loc  # type: ignore[misc]
             by_enum = getattr(self._By, by.upper().replace(" ", "_"))
             return self.backend.find_elements(by_enum, value)
-        # UIAutomator2
         if "xpath" in loc:  # type: ignore[arg-type]
             return self.backend.xpath(loc["xpath"]).all()
         return self.backend(**loc).all()
