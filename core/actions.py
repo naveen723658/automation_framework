@@ -48,7 +48,7 @@ class Actions:
 
                 recent_packages = []
                 for line in lines:
-                    match = re.search(r"A=\d+:(\S+)", line)
+                    match = re.search(r"A=\d+:([a-zA-Z0-9_.]+)", line)
                     if match:
                         recent_packages.append(match.group(1))
 
@@ -69,7 +69,8 @@ class Actions:
             if key in loc_def:
                 try:
                     element = self.finder.find_element(loc_def[key]["type"], loc_def[key]["value"])
-                    time.sleep(0.5)
+                    self.logger.debug(f"Element found: {element}")
+                    time.sleep(1)
                     element.click()
                     return
                 except Exception as e:

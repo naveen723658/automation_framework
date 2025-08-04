@@ -7,7 +7,7 @@ from core.actions import Actions
 from core.helpers import ArtifactHelper
 from utils.yaml_loader import load_test_case, load_steps, load_locators, load_framework_config
 from scripts.selector_transformer import UnifiedElementFinder, MobileSelectorTransformer
-
+# from core.assertions import MobileAssertions
 class Executor:
     def __init__(self, device_config, tc_id, env):
         self.device_config = device_config
