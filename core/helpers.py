@@ -69,5 +69,7 @@ class ArtifactHelper:
             else:
                 driver.save_screenshot(str(file_path))
             self.logger.info(f"Screenshot saved: {file_path}")
+            return file_path
         except Exception as e:
             self.logger.error(f"Failed to take screenshot: {e}")
+            return None

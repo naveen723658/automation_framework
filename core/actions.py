@@ -63,7 +63,7 @@ class Actions:
                 raise
         time.sleep(2)
 
-    def click(self, locator_key, loc_yaml):
+    def click(self, locator_key, loc_yaml, configs=None):
         loc_def = loc_yaml[locator_key]
         for key in ["primary", "fallback_1", "fallback_2"]:
             if key in loc_def:
@@ -74,5 +74,8 @@ class Actions:
                     element.click()
                     return
                 except Exception as e:
-                    self.logger.warning(f"Click failed with {key}: {e}")
-        raise RuntimeError(f"Element not found for {locator_key}")
+                    self.logger.debug(f"Click failed with {key}: {e}")
+                    if configs and configs.get("ignore", False):
+                        self.logger.warning(f"Element {locator_key} not found, but ignoring due to config")
+                        return
+            raise RuntimeError(f"Element not found for {locator_key}")

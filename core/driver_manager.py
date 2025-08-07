@@ -1,4 +1,5 @@
 # core/driver_manager.py
+import time
 import uiautomator2 as u2
 from appium import webdriver
 from appium.options.android import UiAutomator2Options
@@ -11,6 +12,9 @@ class DriverManager:
         if driver_type == "uiautomator2":
             try:
                 d = u2.connect(device_config["udid"])
+                if not d:
+                    raise RuntimeError(f"Failed to connect to device {device_config['udid']}")
+                time.sleep(2)  # wait for the device to be ready
                 logger.debug(f"Connected to uiautomator2 device {device_config['udid']}")
                 return d
             except Exception as e:

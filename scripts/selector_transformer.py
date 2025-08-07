@@ -238,7 +238,7 @@ class UnifiedElementFinder:
     def find_element(self, selector_type: str, selector_value: str):
         """Find one element using a *generic* selector with a 5s UI wait for UIAutomator2."""
         loc = self.transformer.transform_selector(selector_type, selector_value, self.framework)
-
+        
         if self.framework == "appium":
             by, value = loc  # type: ignore[misc]
             by_enum = getattr(self._By, by.upper().replace(" ", "_"))
