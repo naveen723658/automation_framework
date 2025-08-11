@@ -6,7 +6,7 @@ from core.driver_manager import DriverManager
 from core.actions import Actions
 from core.helpers import ArtifactHelper
 from utils.yaml_loader import load_test_case, load_steps, load_locators, load_framework_config
-from scripts.selector_transformer import UnifiedElementFinder, MobileSelectorTransformer
+from scripts.selector_transformer import UnifiedElementFinder
 from utils.device_logs import create_device_logs_manager, DeviceLogsContext
 from core.assertions import create_assertions_helper
 class Executor:
@@ -108,7 +108,14 @@ class Executor:
                     self.logger.debug(f"Processing assertions for step {step_id}")
                     for assertion in step_assertions:
                         try:
-                            if assertion["type"] == "event_triggered":
+                            if assertion["type"] == "app_launched":
+
+                                step_status = self.assertions.assert_current_app(
+                                    expected_package=assertion.get("expected", ""),
+                                    ignore_interference=assertion.get("ignore_interference", False)                                                                        
+                                )
+
+                            elif assertion["type"] == "event_triggered":
                                 log_file = self.device_logs.get_log_file_path()  # Path from DeviceLogs manager
 
                                 step_status = self.assertions.assert_event_triggered(
@@ -121,10 +128,14 @@ class Executor:
                                 )
                             else:
                                 self.logger.warning(f"Unknown assertion type {assertion['type']}")
+
+                            
                         except Exception as e:
                             self.logger.error(f"Assertion failed for step {step_id}: {e}")
                             step_status = False
                             break
+
+                        
                     
 
 
@@ -140,6 +151,7 @@ class Executor:
                     "assertions": [
                         {
                             "type": a.get("type", ""),
+                            "name": a.get("name", ""),
                             "expected": a.get("expected", ""),
                             "status": "passed" if step_status else "failed"
                         }

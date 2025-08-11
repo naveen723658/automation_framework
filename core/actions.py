@@ -33,35 +33,7 @@ class Actions:
         
         # launch app
         self.logger.debug(f"Launching {pkg}")
-        self.d.app_start(pkg, wait=True) if driver_type=="uiautomator2" else self.d.activate_app(pkg)
-        
-        # handle assertions
-        assertion = next((a for a in config.get("assertions", []) if a.get("type") == "app_launched"), None)
-        if assertion:
-            expected_pkg = assertion["expected"]
-
-            try:
-                # Use dumpsys recents to get the most recent tasks
-                cmd = ["adb", "-s", self.device_id, "shell", "dumpsys", "activity", "recents"]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-                lines = [line.strip() for line in result.stdout.splitlines() if "Recent #" in line]
-
-                recent_packages = []
-                for line in lines:
-                    match = re.search(r"A=\d+:([a-zA-Z0-9_.]+)", line)
-                    if match:
-                        recent_packages.append(match.group(1))
-
-                self.logger.debug(f"Recent apps: {recent_packages[:5]}{'...' if len(recent_packages)>5 else ''}")
-
-                if expected_pkg not in recent_packages:
-                    raise RuntimeError(
-                        f"Expected app '{expected_pkg}' not in recents. Found: {recent_packages[:3]}..."
-                    )
-            except Exception as e:
-                self.logger.error(f"App launch verification failed: {e}")
-                raise
-        time.sleep(2)
+        self.d.app_start(pkg, wait=True) if driver_type=="uiautomator2" else self.d.activate_app(pkg)            
 
     def click(self, locator_key, loc_yaml, configs=None):
         loc_def = loc_yaml[locator_key]

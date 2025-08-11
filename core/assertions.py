@@ -4,7 +4,8 @@ Provides comprehensive assertion methods for UI elements, text, visibility, colo
 Supports both uiautomator2 and Appium drivers
 """
 
-import time, re, json
+import time, re, json, subprocess
+
 import logging
 from typing import Dict, Any, Optional, List, Union
 from pathlib import Path
@@ -159,6 +160,7 @@ class MobileAssertions:
                 if str(actual_val).lower() != str(expected_val).lower():
                     return False
         return True
+    
     # ============================================================================
     # VISIBILITY ASSERTIONS
     # ============================================================================
@@ -987,41 +989,81 @@ class MobileAssertions:
     # APPLICATION STATE ASSERTIONS
     # ============================================================================
     
-    def assert_current_app(self, expected_package: str, message: str = None) -> bool:
+
+
+    def assert_current_app(self, expected_package: str, ignore_interference: bool = False) -> bool:
         """
-        Assert that the current app matches expected package
-        
+        Assert that the current app matches the expected package.
+        Optionally ignore interference by checking recent apps.
+
         Args:
-            expected_package: Expected app package name
-            message: Custom error message
-            
+            expected_package (str): Expected app package name
+            ignore_interference (bool): If True, ignores mismatch caused by popups or interference
+                                        and verifies using recent apps list.
+
         Returns:
             bool: True if assertion passes
-            
+
         Raises:
-            AssertionError: If current app does not match
+            AssertionError: If current app does not match and ignore_interference fails
         """
         try:
+            # Get current foreground app
             if self.driver_type == "uiautomator2":
                 current_app = self.driver.app_current().get("package", "")
             else:
-                # Appium
                 current_app = self.driver.current_package
-            
+
+            # Direct match check
             if current_app == expected_package:
                 self.logger.info(f"✅ PASS: Current app is '{expected_package}'")
                 return True
-            else:
-                error_msg = message or f"Current app mismatch. Expected: '{expected_package}', Actual: '{current_app}'"
-                self.logger.error(f"❌ FAIL: {error_msg}")
-                raise AssertionError(error_msg)
-                
+
+            # If mismatch and interference allowed → check recent apps
+            if ignore_interference:
+                self.logger.debug(
+                    f"⚠ Current app '{current_app}' does not match '{expected_package}', "
+                    f"checking recent apps due to interference..."
+                )
+                try:
+                    cmd = ["adb", "-s", self.device_config["udid"], "shell", "dumpsys", "activity", "recents"]
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                    lines = [line.strip() for line in result.stdout.splitlines() if "Recent #" in line]
+
+                    recent_packages = []
+                    for line in lines:
+                        match = re.search(r"A=\d+:([a-zA-Z0-9_.]+)", line)
+                        if match:
+                            recent_packages.append(match.group(1))
+
+                    self.logger.debug(
+                        f"Recent apps: {recent_packages[:5]}{'...' if len(recent_packages) > 5 else ''}"
+                    )
+
+                    if expected_package in recent_packages:
+                        self.logger.info(
+                            f"✅ PASS: Expected app '{expected_package}' found in recent apps"
+                        )
+                        return True
+                    else:
+                        raise AssertionError(
+                            f"Expected app '{expected_package}' not in recents. "
+                            f"Found: {recent_packages[:3]}..."
+                        )
+
+                except Exception as e:
+                    raise AssertionError(f"Interference check failed: {e}")
+
+            # Fail if not ignoring interference and no match
+            raise AssertionError(
+                f"Current app mismatch. Expected: '{expected_package}', Actual: '{current_app}'"
+            )
+
         except AssertionError:
             raise
         except Exception as e:
-            error_msg = message or f"Failed to get current app: {e}"
-            self.logger.error(f"❌ FAIL: {error_msg}")
-            raise AssertionError(error_msg)
+            raise AssertionError(f"Failed to get current app: {e}")
+
     
     def assert_screen_orientation(self, expected_orientation: str, message: str = None) -> bool:
         """

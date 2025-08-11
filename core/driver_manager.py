@@ -1,8 +1,8 @@
 # core/driver_manager.py
 import time
 import uiautomator2 as u2
-from appium import webdriver
-from appium.options.android import UiAutomator2Options
+from appium import webdriver  # type: ignore
+from appium.options.android import UiAutomator2Options # type: ignore
 
 class DriverManager:
     @staticmethod
