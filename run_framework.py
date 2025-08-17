@@ -4,7 +4,7 @@ Entry-point CLI for running YAML test cases with parallel execution support.
 - Supports parallel execution per device
 - Tracks results in JSON
 """
-import sys
+import sys, re
 import argparse
 import subprocess
 from pathlib import Path
@@ -126,6 +126,9 @@ def main() -> None:
         tc_ids = [p.stem for p in tc_dir.glob("*.yaml")]
     else:
         tc_ids = [args.test_case]
+
+    # Sort by numeric part of tcid (TC001 → 1, TC002 → 2, etc.)
+    tc_ids.sort(key=lambda x: int(re.search(r'\d+', x).group()))
 
     # load config and available devices
     cfg = load_framework_config()

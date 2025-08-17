@@ -1,20 +1,22 @@
-# core/actions.py
+# actions/base.py
 import time, subprocess, re
 
-class Actions:
-    def __init__(self, driver, device_config, finder, logger, helpers):
+class BaseActions:
+    def __init__(self, driver, device_config, finder, logger, helpers, locators):
         self.d = driver
         self.device_id = device_config["udid"]
+        self.driver_type = device_config["driver"]
         self.finder = finder
         self.logger = logger
         self.helpers = helpers
+        self.locators = locators
 
-    def launch_app(self, params, config, driver_type):
+    def launch_app(self, params, config):
         pkg = params["app_package"]
 
         if config.get("force_stop", False):
             self.logger.debug(f"Force stopping {pkg}")
-            self.d.app_stop(pkg) if driver_type=="uiautomator2" else self.d.terminate_app(pkg)
+            self.d.app_stop(pkg) if self.driver_type=="uiautomator2" else self.d.terminate_app(pkg)
 
         if config.get("clear_data", False):
             self.logger.debug(f"Clearing data for {pkg} using ADB")
@@ -33,10 +35,10 @@ class Actions:
         
         # launch app
         self.logger.debug(f"Launching {pkg}")
-        self.d.app_start(pkg, wait=True) if driver_type=="uiautomator2" else self.d.activate_app(pkg)            
+        self.d.app_start(pkg, wait=True) if self.driver_type=="uiautomator2" else self.d.activate_app(pkg)            
 
-    def click(self, locator_key, loc_yaml, configs=None):
-        loc_def = loc_yaml[locator_key]
+    def click(self, locator_key, configs=None):
+        loc_def = self.locators[locator_key]
         for key in ["primary", "fallback_1", "fallback_2"]:
             if key in loc_def:
                 try:

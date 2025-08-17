@@ -290,7 +290,7 @@ def generate_html_report(results: List[Dict[str, Any]], input_path: str = "resul
             <div class="bg-white rounded shadow mb-4 border-r-4 ${borderColor}">
                 <button class="w-full flex justify-between items-center p-4 accordion-header" data-idx="${idx}">
                   <div>
-                      <div class="text-xl font-semibold">${escHtml(test.test_id)} – ${escHtml(test.name)}</div>
+                      <div class="text-xl font-semibold text-start">${escHtml(test.test_id)} – ${escHtml(test.name)}</div>
                       <div class="text-sm text-gray-700 text-start">Device: ${escHtml(test.device_id)} | Driver: ${escHtml(test.driver)}</div>
                   </div>
 

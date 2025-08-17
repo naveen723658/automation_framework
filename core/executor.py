@@ -2,13 +2,15 @@
 import json, time, os
 from datetime import datetime
 from pathlib import Path
-from core.driver_manager import DriverManager
-from core.actions import Actions
+
+from actions import Actions
+
 from core.helpers import ArtifactHelper
-from utils.yaml_loader import load_test_case, load_steps, load_locators, load_framework_config
+from core.driver_manager import DriverManager
+from core.assertions import create_assertions_helper
 from scripts.selector_transformer import UnifiedElementFinder
 from utils.device_logs import create_device_logs_manager, DeviceLogsContext
-from core.assertions import create_assertions_helper
+from utils.yaml_loader import load_test_case, load_steps, load_locators, load_framework_config
 class Executor:
     def __init__(self, device_config, tc_id, env):
         self.device_config = device_config
@@ -19,8 +21,8 @@ class Executor:
         self.logger = self.helpers.logger
         self.driver = DriverManager.initialize_driver(device_config, self.logger)
         self.finder = UnifiedElementFinder(self.driver, device_config["driver"])
-        self.actions = Actions(self.driver, self.device_config, self.finder, self.logger, self.helpers)
         self.loc_yaml = load_locators()
+        self.actions = Actions(self.driver, self.device_config, self.finder, self.logger, self.helpers, self.loc_yaml)
         self.test_yaml = load_test_case(tc_id)
         self.steps_yaml = load_steps(self.test_yaml.get("step_file", "base_steps.yaml"))
 
@@ -83,10 +85,13 @@ class Executor:
                             step_screenshot = self.helpers.take_screenshot(self.driver, self.device_config["driver"], step_id)
 
                         if action == "launch_app":
-                            self.actions.launch_app(params, configs, self.device_config["driver"])
+                            self.actions.launch_app(params, configs)
                         elif action == "click":
                             locator_key = params.get("locator_id") or params.get("locator_key")
-                            self.actions.click(locator_key, self.loc_yaml, configs)
+                            self.actions.click(locator_key, configs)
+                        elif action == "swipe_until_visible":
+                            self.actions.swipe_until_visible(params, configs)
+                            
                         else:
                             self.logger.warning(f"Unknown action {action}")
                         
@@ -134,11 +139,6 @@ class Executor:
                             self.logger.error(f"Assertion failed for step {step_id}: {e}")
                             step_status = False
                             break
-
-                        
-                    
-
-
 
                 step_duration = round(time.time() - step_start, 2)
                 steps_results.append({
