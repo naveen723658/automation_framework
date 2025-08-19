@@ -24,7 +24,7 @@ class Executor:
         self.loc_yaml = load_locators()
         self.actions = Actions(self.driver, self.device_config, self.finder, self.logger, self.helpers, self.loc_yaml)
         self.test_yaml = load_test_case(tc_id)
-        self.steps_yaml = load_steps(self.test_yaml.get("step_file", "base_steps.yaml"))
+        self.steps_yaml = load_steps("base_steps.yaml")  # default steps file
 
         self.assertions = create_assertions_helper(
             self.driver,
@@ -59,6 +59,10 @@ class Executor:
 
             for step in self.test_yaml["test_steps"]: # iterate over steps
                 step_id = step["step_id"] # get step ID
+                step_file = step.get("file") # get step file, default to base_steps.yaml
+                if step_file:
+                    self.steps_yaml = load_steps(step_file)
+                    
                 action = self.steps_yaml[step_id]["action"] # get action to perform
                 params = self.steps_yaml[step_id].get("parameters", {}) # get step parameters
                 configs = step.get("configs", {}) # get step configs
@@ -104,7 +108,7 @@ class Executor:
                             break
                         else:
                             self.logger.warning(f"Retrying step {step_id} ({attempts}/{retry_count})")
-                            time.sleep(2)
+                            time.sleep(1)
 
                 # if wait_timeout is configured, then add this time in step_start timestamp
                 start_timestamp = step_start + configs.get("wait_timeout", 0)
@@ -120,6 +124,17 @@ class Executor:
                                     ignore_interference=assertion.get("ignore_interference", False)                                                                        
                                 )
 
+                            elif assertion["type"] == "wait_until_visible":
+                                step_status = self.assertions.assert_element_appears(
+                                    expected=assertion.get("expected", ""),
+                                    timeout=assertion.get("timeout", 2),
+                                    check_interval=assertion.get("check_interval")
+                                )
+                            elif assertion["type"] == "assert_visible":
+                                step_status = self.assertions.assert_visible(
+                                    expected=assertion.get("expected", ""),
+                                    timeout=assertion.get("timeout", 2),
+                                )
                             elif assertion["type"] == "event_triggered":
                                 log_file = self.device_logs.get_log_file_path()  # Path from DeviceLogs manager
 
@@ -131,6 +146,7 @@ class Executor:
                                     buffer_timeout=int(assertion.get("buffer_timeout", 2) + round(time.time() - step_start, 2)),
                                     event_config=self.cfg.get("events", {})
                                 )
+
                             else:
                                 self.logger.warning(f"Unknown assertion type {assertion['type']}")
 

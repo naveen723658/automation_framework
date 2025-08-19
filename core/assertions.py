@@ -162,17 +162,66 @@ class MobileAssertions:
         return True
     
     # ============================================================================
+    # CONTINUOUS ELEMENT WATCHING ASSERTIONS
+    # ============================================================================
+
+    def assert_element_appears(self, expected: str, timeout: int = 30, check_interval: float = 0.5) -> bool:
+        """
+        Continuously watch for an element to appear within the specified timeout
+        
+        Args:
+            expected: locator Key to find element in locators dictionary
+            timeout: Maximum time to wait for element to appear (seconds)
+            check_interval: Time between checks (seconds)
+            
+        Returns:
+            bool: True if element appears within timeout
+            
+        Raises:
+            AssertionError: If element does not appear within timeout
+        """
+        start_time = time.time()
+        elapsed_time = 0
+        check_count = 0
+        
+        self.logger.debug(f"Starting continuous watch for element '{expected}' "
+                        f"(timeout: {timeout}s, interval: {check_interval}s)")
+        
+        while elapsed_time < timeout:
+            check_count += 1
+            try:
+                # Try to find the element
+                element = self._find_element(expected)
+                if element and self._is_element_visible(element):
+                    elapsed_time = time.time() - start_time
+                    self.logger.info(f"✅ PASS: Element '{expected}' appeared after "
+                                f"{elapsed_time:.2f}s ({check_count} checks)")
+                    return True
+                    
+            except Exception as e:
+                # Element not found or not visible yet, continue watching
+                continue
+            
+            # Wait before next check
+            time.sleep(check_interval)
+            elapsed_time = time.time() - start_time
+        
+        # Element did not appear within timeout
+        error_msg = (f"Element '{expected}' did not appear within "f"{timeout}s (checked {check_count} times)")
+        self.logger.debug(f"assertion failed: {error_msg}")
+        raise AssertionError(error_msg)
+
+    # ============================================================================
     # VISIBILITY ASSERTIONS
     # ============================================================================
     
-    def assert_visible(self, locator_key: str, timeout: int = 10, message: str = None) -> bool:
+    def assert_visible(self, expected: str, timeout: int = 10) -> bool:
         """
         Assert that an element is visible on screen
         
         Args:
-            locator_key: Key to find element in locators dictionary
+            expected: Key to find element in locators dictionary
             timeout: Maximum time to wait for element
-            message: Custom error message
             
         Returns:
             bool: True if assertion passes
@@ -181,18 +230,18 @@ class MobileAssertions:
             AssertionError: If element is not visible
         """
         try:
-            element = self._find_element_with_wait(locator_key, timeout)
+            element = self._find_element_with_wait(expected, timeout)
             
             if self._is_element_visible(element):
-                self.logger.info(f"✅ PASS: Element '{locator_key}' is visible")
+                self.logger.info(f"✅ PASS: Element '{expected}' is visible")
                 return True
             else:
-                error_msg = message or f"Element '{locator_key}' is not visible"
+                error_msg = f"Element '{expected}' is not visible"
                 self.logger.error(f"❌ FAIL: {error_msg}")
                 raise AssertionError(error_msg)
                 
         except Exception as e:
-            error_msg = message or f"Element '{locator_key}' not found or not visible: {e}"
+            error_msg = f"Element '{expected}' not found or not visible: {e}"
             self.logger.error(f"❌ FAIL: {error_msg}")
             raise AssertionError(error_msg)
     
@@ -1190,7 +1239,7 @@ class MobileAssertions:
         """Check if element is visible"""
         try:
             if self.driver_type == "uiautomator2":
-                return element.exists and element.info.get('visible', False)
+                return element.exists and element.info.get('visibleToUser', False)
             else:
                 # Appium
                 return element.is_displayed()

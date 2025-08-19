@@ -43,8 +43,8 @@ class BaseActions:
             if key in loc_def:
                 try:
                     element = self.finder.find_element(loc_def[key]["type"], loc_def[key]["value"])
-                    self.logger.debug(f"Element found: {element}")
                     time.sleep(1)
+                    self.logger.debug(f"Element found: {element}")
                     element.click()
                     return
                 except Exception as e:

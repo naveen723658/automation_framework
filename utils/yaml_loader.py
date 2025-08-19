@@ -34,5 +34,22 @@ def load_steps(step_file: str = "base_steps.yaml") -> Dict[str, Any]:
 
 
 def load_locators() -> Dict[str, Any]:
-    fn = ROOT / "test_suite" / "locators" / "base_locators.yaml"
-    return _read_yaml(fn)
+    """
+    Load all locator files from the locators folder and combine them.
+    Only files ending with 'locators.yaml' or 'locators.yml' are considered.
+    """
+    locators_dir = ROOT / "test_suite" / "locators"
+    combined_locators: Dict[str, Any] = {}
+
+    for file_path in locators_dir.glob("*locators.y*ml"):
+        if file_path.is_file():
+            data = _read_yaml(file_path)
+            # Merge, but warn if duplicate keys
+            for key, value in data.items():
+                if key in combined_locators:
+                    raise ValueError(
+                        f"Duplicate locator key '{key}' found in {file_path}"
+                    )
+                combined_locators[key] = value
+
+    return combined_locators
