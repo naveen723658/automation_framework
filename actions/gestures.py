@@ -1,20 +1,34 @@
 # actions/gestures.py
 import time
-class GestureActions:
-    def __init__(self, driver, device_config, finder, logger, helpers, locators):
-        self.d = driver # Device instance 
-        self.device_id = device_config["udid"] # Device seral id
-        self.driver_type = device_config["driver"] # Driver name e.g. uiautomator2 or appium
-        self.finder = finder
-        self.logger = logger
-        self.helpers = helpers
-        self.locators = locators
+from .base import BaseActions
+class GestureActions(BaseActions):
 
+    # ============================================================================
+    # Common Config Validator
+    # ============================================================================
+    def _validate_configs(self, params, configs):
+        """Merge params and configs with defaults for swipe actions"""
+        return {
+            "target": params.get("target"),
+            "selector": params.get("selector") or params.get("locator_id"),
+            "parent": params.get("parent"),
+            "child_selector": params.get("child_selector"),
+
+            # General swipe configs
+            "direction": configs.get("direction", params.get("direction", "up")),
+            "fallback_direction": configs.get("fallback_direction", ""),
+            "max_swipe": configs.get("max_swipe", params.get("max_swipe", 10)),
+            "distance": configs.get("distance", params.get("distance", 0.7)),
+            "count": configs.get("count", params.get("count", 1)),
+            "timeout": configs.get("timeout", 10),
+            "message": configs.get("message"),
+        }
+    
     # ============================================================================
     # Swipe & Gesture Methods
     # ============================================================================
 
-    def swipe_until_visible(self, params, config):
+    def swipe_until_visible(self, params, configs=None):
         """
         Swipe until a target element becomes visible
         
@@ -26,29 +40,25 @@ class GestureActions:
                 - target: Target element to find
             configs: Additional configurations
         """
-        direction = config.get("direction", "left")
-        f_direction = config.get("fallback_direction", "right")
-        max_swipes = config.get("max_swipe", 10)
+        cfg = self._validate_configs(params, configs)
+        target, direction, f_direction, max_swipes, selector = (
+            cfg["target"], cfg["direction"], cfg["fallback_direction"], cfg["max_swipe"], cfg["selector"]
+        )
 
-        selector_key = params.get("locator_id", None)
-        target_key = params.get("target", None)
-        
-        if not target_key:
+        if not target:
             raise ValueError("Target element key is required for swipe_until_visible")
-        
-        self.logger.debug(f"Starting swipe until visible: direction={direction}, max_swipes={max_swipes}, target={target_key}")
-        
-        # First attempt: main direction
-        if self._swipe_in_direction_until_visible(target_key, direction, max_swipes, selector_key):
+
+        self.logger.debug(f"Starting swipe until visible: direction={direction}, max_swipes={max_swipes}, target={target}")
+
+        if self._swipe_in_direction_until_visible(target, direction, max_swipes, selector):
             return True
-        
-        # Try fallback direction if specified
+
         if f_direction and f_direction != direction:
-            self.logger.info(f"Primary direction '{direction}' failed, trying fallback direction '{f_direction}'")
-            if self._swipe_in_direction_until_visible(target_key, f_direction, max_swipes, selector_key):
+            self.logger.info(f"Primary '{direction}' failed, trying fallback '{f_direction}'")
+            if self._swipe_in_direction_until_visible(target, f_direction, max_swipes, selector):
                 return True
-        
-        self.logger.warning(f"Target element '{target_key}' not found after {max_swipes} swipes")
+
+        self.logger.warning(f"Target '{target}' not found after {max_swipes} swipes")
         return False
 
     def swipe_until_not_visible(self, params, configs=None):
@@ -58,42 +68,33 @@ class GestureActions:
         Args:
             params: Dictionary containing:
                 - direction: "up", "down", "left", "right"
-                - maxswipe: Maximum number of swipes (default: 10)
+                - max_swipe: Maximum number of swipes (default: 10)
                 - selector: Optional element to use as swipe area
                 - target: Target element that should disappear
             configs: Additional configurations
         """
-        direction = params.get("direction", "up")
-        max_swipes = params.get("maxswipe", 10)
-        selector_key = params.get("selector")
-        target_key = params.get("target")
-        
-        if not target_key:
+        cfg = self._validate_configs(params, configs or {})
+        target, direction, max_swipes, selector = (
+            cfg["target"], cfg["direction"], cfg["max_swipe"], cfg["selector"]
+        )
+
+        if not target:
             raise ValueError("Target element key is required for swipe_until_not_visible")
-        
-        self.logger.debug(f"Starting swipe until not visible: direction={direction}, max_swipes={max_swipes}, target={target_key}")
-        
-        # Check if target element is initially visible
-        if not self._is_element_visible(target_key):
-            self.logger.info(f"Target element '{target_key}' is already not visible")
+
+        self.logger.debug(f"Swipe until not visible: direction={direction}, max_swipes={max_swipes}, target={target}")
+
+        if not self._is_element_visible(target):
+            self.logger.info(f"Target '{target}' already not visible")
             return True
-        
-        # Get swipe coordinates
-        swipe_coords = self._get_swipe_coordinates(selector_key, direction)
-        
+
+        swipe_coords = self._get_swipe_coordinates(selector, direction)
         for swipe_count in range(max_swipes):
-            # Perform swipe
             self._perform_swipe(swipe_coords, direction)
-            time.sleep(0.5)  # Brief pause between swipes
-            
-            # Check if target element is no longer visible
-            if not self._is_element_visible(target_key):
-                self.logger.info(f"Target element '{target_key}' disappeared after {swipe_count + 1} swipes")
+            time.sleep(0.5)
+            if not self._is_element_visible(target):
+                self.logger.info(f"Target '{target}' disappeared after {swipe_count + 1} swipes")
                 return True
-            
-            self.logger.debug(f"Swipe {swipe_count + 1}/{max_swipes} completed, target still visible")
-        
-        self.logger.warning(f"Target element '{target_key}' still visible after {max_swipes} swipes")
+        self.logger.warning(f"Target '{target}' still visible after {max_swipes} swipes")
         return False
 
     def swipe_and_collect_children(self, params, configs=None):
@@ -112,52 +113,42 @@ class GestureActions:
         Returns:
             List of collected child elements information
         """
-        direction = params.get("direction", "up")
-        max_swipes = params.get("maxswipe", 10)
-        selector_key = params.get("selector")
-        parent_key = params.get("parent")
-        child_selector = params.get("child_selector")
-        
+        cfg = self._validate_configs(params, configs)
+        direction, max_swipes, selector, parent_key, child_selector = (
+            cfg["direction"], cfg["max_swipe"], cfg["selector"], cfg["parent"], cfg["child_selector"]
+        )
+
         if not parent_key or not child_selector:
             raise ValueError("Parent and child_selector are required for swipe_and_collect_children")
-        
-        self.logger.debug(f"Starting swipe and collect children: direction={direction}, max_swipes={max_swipes}")
-        
-        collected_elements = []
-        seen_elements = set()  # To avoid duplicates
-        
-        # Get swipe coordinates
-        swipe_coords = self._get_swipe_coordinates(selector_key, direction)
-        
-        for swipe_count in range(max_swipes + 1):  # +1 to collect initial elements
-            # Collect current child elements
+
+        self.logger.debug(f"Swipe and collect children: dir={direction}, max_swipes={max_swipes}")
+
+        collected, seen = [], set()
+        swipe_coords = self._get_swipe_coordinates(selector, direction)
+
+        for swipe_count in range(max_swipes + 1):
             try:
                 current_children = self._collect_child_elements(parent_key, child_selector)
-                
                 for child in current_children:
-                    # Create a unique identifier for the child (could be text, bounds, etc.)
                     child_id = self._get_element_identifier(child)
-                    
-                    if child_id not in seen_elements:
-                        seen_elements.add(child_id)
-                        collected_elements.append(child)
-                        self.logger.debug(f"Collected new child element: {child_id}")
-                
+                    if child_id not in seen:
+                        seen.add(child_id)
+                        collected.append(child)
+                        self.logger.debug(f"Collected new child: {child_id}")
             except Exception as e:
                 self.logger.debug(f"Error collecting children on swipe {swipe_count}: {e}")
-            
-            # Don't swipe on the last iteration
+
             if swipe_count < max_swipes:
                 self._perform_swipe(swipe_coords, direction)
-                time.sleep(0.5)  # Brief pause between swipes
-        
-        self.logger.info(f"Collected {len(collected_elements)} unique child elements after {max_swipes} swipes")
-        return collected_elements
+                time.sleep(0.5)
+
+        self.logger.info(f"Collected {len(collected)} unique children after {max_swipes} swipes")
+        return collected
 
     def swipe(self, params, configs=None):
         """
         Perform a basic swipe action
-        
+
         Args:
             params: Dictionary containing:
                 - direction: "up", "down", "left", "right"
@@ -166,23 +157,23 @@ class GestureActions:
                 - distance: Swipe distance as percentage (default: 0.7)
             configs: Additional configurations
         """
-        direction = params.get("direction", "up")
-        count = params.get("count", 1)
-        selector_key = params.get("selector")
-        distance = params.get("distance", 0.7)
-        
-        self.logger.debug(f"Performing {count} swipe(s) in direction: {direction}")
-        
-        # Get swipe coordinates
-        swipe_coords = self._get_swipe_coordinates(selector_key, direction, distance)
-        
+        cfg = self._validate_configs(params, configs)
+        direction, count, selector, distance = (
+            cfg["direction"], cfg["count"], cfg["selector"], cfg["distance"]
+        )
+
+        self.logger.debug(f"Performing {count} swipe(s) in direction: {direction}, distance={distance}")
+        swipe_coords = self._get_swipe_coordinates(selector, direction, distance)
+
         for i in range(count):
             self._perform_swipe(swipe_coords, direction)
-            
-            if i < count - 1:  # Don't sleep after the last swipe
+
+            if i < count - 1:
                 time.sleep(0.5)
-            
+
             self.logger.debug(f"Swipe {i + 1}/{count} completed")
+
+        return True
 
     def swipe_to_element(self, params, configs=None):
         """
@@ -196,30 +187,25 @@ class GestureActions:
                 - selector: Optional element to use as swipe area
             configs: Additional configurations
         """
-        target_key = params.get("target")
-        direction = params.get("direction", "up")
-        max_swipes = params.get("maxswipe", 10)
-        selector_key = params.get("selector")
-        
-        if not target_key:
+        cfg = self._validate_configs(params, configs)
+        target, direction, max_swipes, selector = (
+            cfg["target"], cfg["direction"], cfg["max_swipe"], cfg["selector"]
+        )
+
+        if not target:
             raise ValueError("Target element key is required for swipe_to_element")
-        
-        # First, try to find the element without swiping
-        if self._is_element_visible(target_key):
-            self.logger.info(f"Target element '{target_key}' is already visible")
+
+        if self._is_element_visible(target):
+            self.logger.info(f"Target '{target}' already visible")
             return True
-        
-        # Try swiping in the specified direction first
-        if self.swipe_until_visible({"direction": direction, "maxswipe": max_swipes//2, 
-                                    "selector": selector_key, "target": target_key}):
+
+        if self.swipe_until_visible({"target": target, "direction": direction, "max_swipe": max_swipes // 2, "selector": selector}, cfg):
             return True
-        
-        # If not found, try the opposite direction
-        opposite_direction = self._get_opposite_direction(direction)
-        self.logger.debug(f"Trying opposite direction: {opposite_direction}")
-        
-        return self.swipe_until_visible({"direction": opposite_direction, "maxswipe": max_swipes//2,
-                                        "selector": selector_key, "target": target_key})
+
+        opposite = self._get_opposite_direction(direction)
+        self.logger.debug(f"Trying opposite direction: {opposite}")
+
+        return self.swipe_until_visible({"target": target, "direction": opposite, "max_swipe": max_swipes // 2, "selector": selector}, cfg)
 
     def swipe_refresh(self, params, configs=None):
         """
@@ -230,23 +216,20 @@ class GestureActions:
                 - selector: Optional element to use as swipe area
             configs: Additional configurations
         """
-        selector_key = params.get("selector")
-        
+        cfg = self._validate_configs(params, configs)
+        selector = cfg["selector"]
+
         self.logger.debug("Performing pull-to-refresh swipe")
-        
-        # For refresh, we always swipe down from top
-        swipe_coords = self._get_swipe_coordinates(selector_key, "down", distance=0.5)
-        
-        # Adjust start point to be near the top for refresh
+        swipe_coords = self._get_swipe_coordinates(selector, "down", distance=0.5)
+
         if self.driver_type == "uiautomator2":
-            # Get screen size
             info = self.d.info
             screen_height = info['displayHeight']
-            swipe_coords = (swipe_coords[0], int(screen_height * 0.1), 
-                           swipe_coords[2], int(screen_height * 0.6))
-        
+            swipe_coords = (swipe_coords[0], int(screen_height * 0.1),
+                            swipe_coords[2], int(screen_height * 0.6))
+
         self._perform_swipe(swipe_coords, "down")
-        time.sleep(1)  # Wait for refresh to complete
+        time.sleep(1)  # Wait for refresh
 
     
     # ============================================================================

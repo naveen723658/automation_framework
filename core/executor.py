@@ -4,10 +4,10 @@ from datetime import datetime
 from pathlib import Path
 
 from actions import Actions
+from assertions import Assertions
 
 from core.helpers import ArtifactHelper
 from core.driver_manager import DriverManager
-from core.assertions import create_assertions_helper
 from scripts.selector_transformer import UnifiedElementFinder
 from utils.device_logs import create_device_logs_manager, DeviceLogsContext
 from utils.yaml_loader import load_test_case, load_steps, load_locators, load_framework_config
@@ -26,13 +26,7 @@ class Executor:
         self.test_yaml = load_test_case(tc_id)
         self.steps_yaml = load_steps("base_steps.yaml")  # default steps file
 
-        self.assertions = create_assertions_helper(
-            self.driver,
-            self.device_config,
-            self.loc_yaml,
-            self.finder,
-            self.logger
-        )
+        self.assertions = Assertions(self.driver, self.device_config, self.finder, self.logger, self.loc_yaml, self.actions, self.helpers)
         
         # --- Device Logs Integration ---
         self.device_logs = None
@@ -124,7 +118,7 @@ class Executor:
                                     ignore_interference=assertion.get("ignore_interference", False)                                                                        
                                 )
 
-                            elif assertion["type"] == "wait_until_visible":
+                            elif assertion["type"] == "assert_element_appears":
                                 step_status = self.assertions.assert_element_appears(
                                     expected=assertion.get("expected", ""),
                                     timeout=assertion.get("timeout", 2),
@@ -134,6 +128,22 @@ class Executor:
                                 step_status = self.assertions.assert_visible(
                                     expected=assertion.get("expected", ""),
                                     timeout=assertion.get("timeout", 2),
+                                )
+                            elif assertion["type"] == "assert_exists":
+                                step_status = self.assertions.assert_exists(
+                                    configs=assertion
+                                )
+                            elif assertion["type"] == "assert_not_exists":
+                                step_status = self.assertions.assert_not_exists(
+                                    configs=assertion
+                                )
+                            elif assertion["type"] == "assert_disabled":
+                                step_status = self.assertions.assert_disabled(
+                                    configs=assertion
+                                )
+                            elif assertion["type"] == "assert_enabled":
+                                step_status = self.assertions.assert_enabled(
+                                    configs=assertion
                                 )
                             elif assertion["type"] == "event_triggered":
                                 log_file = self.device_logs.get_log_file_path()  # Path from DeviceLogs manager

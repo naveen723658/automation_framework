@@ -103,24 +103,25 @@ def generate_html_report(results: List[Dict[str, Any]], input_path: str = "resul
     const results = __RESULTS_JSON__;
     let allResults = [...results]; // Keep original results for charts
 
-    function openStepModalByIndex(testIdx, stepId) {
-        openStepModal(results[testIdx], stepId);  // wrapper
+    function openStepModalByIndex(testIdx, stepIdx) {
+      openStepModal(results[testIdx], stepIdx); // wrapper passes index
     }
 
     // Utility: safe text for HTML insertion (minimal)
     function escHtml(s){ if(s===null||s===undefined) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
     // Function to open step modal with detailed information
-    function openStepModal(testData, stepId) {
-      const testId = testData.test_id;
-      const step = testData.steps.find(s => s.step_id === stepId);
+    function openStepModal(testData, stepIdx) {
+      const step = testData.steps[stepIdx];
       if (!step) return;
+      const testId = testData.test_id;
+
 
       const modal = document.getElementById('stepModal');
       const title = document.getElementById('modalTitle');
       const content = document.getElementById('modalContent');
 
-      title.textContent = `${stepId.toUpperCase()} - ${step.name || ''}`;
+      title.textContent = `${(step.step_id || '').toUpperCase()} - ${step.name || ''}`;
 
       // Build detailed step information
       let modalHtml = `
@@ -246,7 +247,7 @@ def generate_html_report(results: List[Dict[str, Any]], input_path: str = "resul
     });
 
     function createStepsSection(steps, testIndex){
-      return steps.map(step=>{
+      return steps.map((step, stepIdx)=>{
         const borderColor = (step.status||'').toLowerCase()==='passed'?'border-green-500':(step.status||'').toLowerCase()==='failed'?'border-red-500':'border-yellow-500';
         const assertionsHtml = (step.assertions||[]).map(a=>{
           const bulletColor = (a.status||'').toLowerCase()==='passed'?'bg-green-500':'bg-red-500';
@@ -254,7 +255,7 @@ def generate_html_report(results: List[Dict[str, Any]], input_path: str = "resul
         }).join('');
 
         return `<div class="step step-clickable border border-r-4 bg-white p-4 hover:scale-105 transition-transform duration-300 ${borderColor} pr-3 py-2 mb-3" 
-        onclick="openStepModalByIndex(${testIndex}, '${step.step_id}')" 
+        onclick="openStepModalByIndex(${testIndex}, ${stepIdx})" 
         title="Click to view detailed step information">
           <div class="flex justify-between items-center">
             <span class="font-semibold">${escHtml(step.step_id||'').toUpperCase()} - ${escHtml(step.name||'')}</span>
